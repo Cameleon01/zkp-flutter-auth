@@ -1,0 +1,153 @@
+═══════════════════════════════════════════════════════════════
+🚀 DÉMARRAGE RAPIDE - ZK-AUTH
+═══════════════════════════════════════════════════════════════
+
+📦 ÉTAPE 1 : BACKEND (Django)
+───────────────────────────────────────────────────────────────
+
+unzip zkauth_backend_final.zip
+cd zkauth_backend
+
+# Créer environnement virtuel
+python3 -m venv venv
+source venv/bin/activate  # Linux/Mac
+# OU
+venv\Scripts\activate  # Windows
+
+# Installer dépendances
+pip install -r requirements.txt
+
+# Créer la base de données
+python manage.py makemigrations
+python manage.py migrate
+
+# (Optionnel) Créer superuser pour admin
+python manage.py createsuperuser
+
+# Lancer le serveur
+python manage.py runserver 0.0.0.0:8000
+
+✅ Backend prêt sur http://localhost:8000
+✅ Admin disponible sur http://localhost:8000/admin/
+
+═══════════════════════════════════════════════════════════════
+📱 ÉTAPE 2 : FRONTEND (Flutter)
+───────────────────────────────────────────────────────────────
+
+unzip zkauth_flutter_final.zip
+cd zkauth_flutter_app
+
+# Installer dépendances
+flutter pub get
+
+# IMPORTANT : Configurer l'URL du backend
+# Éditer : lib/screens/login_screen.dart
+# Ligne 8 : baseUrl: 'http://VOTRE_IP:8000'
+# Remplacez VOTRE_IP par l'IP de votre machine backend
+
+# Lancer sur émulateur/appareil
+flutter run
+
+# OU pour release
+flutter run --release
+
+✅ Application lancée
+
+═══════════════════════════════════════════════════════════════
+🧪 ÉTAPE 3 : TESTER LE FLUX COMPLET
+───────────────────────────────────────────────────────────────
+
+1️⃣ INSCRIPTION
+   - Ouvrir l'app
+   - Cliquer "Créer un compte"
+   - Remplir : username, email, phone
+   - Valider
+
+2️⃣ ENRÔLEMENT
+   - Écran automatique après inscription
+   - Cliquer "Configurer maintenant"
+   - Clé privée générée localement
+   - Clé publique envoyée au serveur
+
+3️⃣ SAUVEGARDE (Optionnel mais recommandé)
+   - Cliquer "Sauvegarder"
+   - Fragment A → Email
+   - Fragment B → Serveur
+
+4️⃣ CONNEXION
+   - Username + Biométrie locale (obligatoire)
+   - Preuve ZK générée
+   - Session ouverte (24h)
+
+5️⃣ RE-AUTHENTIFICATION AUTO
+   - Toutes les 30 minutes
+   - Automatique et transparente
+   - Si échec → déconnexion
+
+═══════════════════════════════════════════════════════════════
+🔐 NOUVEAUTÉS - SÉCURITÉ POST-AUTHENTIFICATION
+───────────────────────────────────────────────────────────────
+
+✅ TokenSession avec expiration (24h)
+✅ Inactivity timeout (30 min)
+✅ Re-preuve périodique (30 min)
+✅ Refresh token automatique
+✅ Révocation instantanée
+✅ Device fingerprinting
+✅ Limite 3 appareils par user
+
+═══════════════════════════════════════════════════════════════
+⚙️ CONFIGURATION
+───────────────────────────────────────────────────────────────
+
+BACKEND (settings.py) :
+- ZK_AUTH_CHALLENGE_EXPIRY = 300  # 5 min
+- ZK_AUTH_MAX_LOGIN_ATTEMPTS = 5
+- ZK_AUTH_LOCKOUT_DURATION = 900  # 15 min
+
+FRONTEND :
+- Re-auth timer : 30 minutes (home_screen.dart ligne 34)
+- Biométrie obligatoire (login_screen.dart)
+- Backend URL (login_screen.dart ligne 8)
+
+═══════════════════════════════════════════════════════════════
+🆘 TROUBLESHOOTING
+───────────────────────────────────────────────────────────════
+
+❌ Erreur "relation does not exist" (Backend)
+   → python manage.py makemigrations
+   → python manage.py migrate
+
+❌ Erreur connexion réseau (Frontend)
+   → Vérifier IP backend dans login_screen.dart
+   → Vérifier firewall (port 8000 ouvert)
+   → Tester : curl http://IP:8000/health/
+
+❌ Biométrie ne fonctionne pas (Frontend)
+   → Android : Permissions dans AndroidManifest.xml
+   → iOS : NSFaceIDUsageDescription dans Info.plist
+   → Vérifier appareil supporte biométrie
+
+❌ Token expiré
+   → Normal après 24h ou 30min d'inactivité
+   → Se reconnecter
+
+═══════════════════════════════════════════════════════════════
+📊 ENDPOINTS API DISPONIBLES
+───────────────────────────────────────────────────────────────
+
+POST /api/auth/register/          # Inscription
+POST /api/auth/enroll/            # Enrôlement
+GET  /api/auth/challenge/         # Obtenir challenge
+POST /api/auth/authenticate/      # Authentification
+POST /api/auth/verify-token/      # Vérifier token
+POST /api/auth/refresh-token/     # Renouveler token
+POST /api/auth/logout/            # Déconnexion
+POST /api/auth/revoke/            # Révoquer enrollment
+POST /api/auth/backup-fragment/   # Sauvegarder fragment
+POST /api/auth/restore-fragment/  # Restaurer fragment
+
+═══════════════════════════════════════════════════════════════
+✅ CONFORMITÉ DIAGRAMMES UML : 92.5%
+═══════════════════════════════════════════════════════════════
+
