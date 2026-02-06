@@ -14,7 +14,7 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-ms(j!0sgkyxef8(wlvr!3
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,10.64.10.211,0.0.0.0,192.168.100.6', cast=Csv())
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,10.64.10.211,0.0.0.0,192.168.100.6,172.25.215.80', cast=Csv())
 
 # Application definition
 INSTALLED_APPS = [
@@ -69,7 +69,7 @@ WSGI_APPLICATION = 'zkauth_project.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME', default='momo_db2'),
+        'NAME': config('DB_NAME', default='momo_db1'),
         'USER': config('DB_USER', default='postgres'),
         'PASSWORD': config('DB_PASSWORD', default='Sunbeam@12'),
         'HOST': config('DB_HOST', default='localhost'),

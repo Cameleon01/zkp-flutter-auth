@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:zk_auth_sdk/zk_auth_sdk.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import '../main.dart';
 import 'enrollment_screen.dart';
+import 'package:local_auth/local_auth.dart';
+import 'package:flutter/services.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -13,81 +13,107 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
 
-  bool _isLoading = false;
+  bool _isRegistering = false;
   String? _errorMessage;
 
   @override
   void dispose() {
     _usernameController.dispose();
     _emailController.dispose();
-    _phoneController.dispose();
     super.dispose();
   }
 
   Future<void> _register() async {
-    if (!_formKey.currentState!.validate()) {
+    final username = _usernameController.text.trim();
+    final email = _emailController.text.trim();
+
+    if (username.isEmpty || email.isEmpty) {
+      setState(() {
+        _errorMessage = 'Username et Email sont requis';
+      });
       return;
     }
 
+    //  AJOUT : Authentification AVANT inscription
     setState(() {
-      _isLoading = true;
+      _isRegistering = true;
       _errorMessage = null;
     });
 
     try {
-      print(
-        'ðŸ“ [RegisterScreen] Inscription pour: ${_usernameController.text}',
+      // Demander authentification Android d'abord
+      final localAuth = LocalAuthentication();
+
+      final authenticated = await localAuth.authenticate(
+        localizedReason: 'Authentifiez-vous pour créer votre compte',
+        options: const AuthenticationOptions(
+          stickyAuth: true,
+          biometricOnly: false,
+        ),
       );
 
-      // Etape 1 : Créer le compte utilisateur basique
-      final response = await http.post(
-        Uri.parse('${zkAuthClient.baseUrl}/api/auth/register/'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'username': _usernameController.text.trim(),
-          'email': _emailController.text.trim(),
-          'phone': _phoneController.text.trim(),
-        }),
+      if (!authenticated) {
+        setState(() {
+          _errorMessage = 'Authentification requise';
+          _isRegistering = false;
+        });
+        return;
+      }
+    } on PlatformException catch (e) {
+      setState(() {
+        _errorMessage = 'Erreur authentification: ${e.message}';
+        _isRegistering = false;
+      });
+      return;
+    }
+
+    try {
+      print('[REGISTER] Inscription: $username');
+
+      // Inscription (pas de password, Android gérera la sécurité)
+      final result = await zkAuthClient.register(
+        username: username,
+        email: email,
+        password: username, // Juste pour l'API, non utilisé réellement
       );
 
-      print('ðŸ“¡ [RegisterScreen] Statut: ${response.statusCode}');
+      if (mounted) {
+        if (result.success) {
+          print('[REGISTER] ✓ Inscription réussie');
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Inscription réussie'),
+              backgroundColor: Colors.green,
+            ),
+          );
 
-        print(' Compte ');
-
-        if (mounted) {
-          // Etape 2 : Rediriger vers l'Enrollement ZK-AUTH
+          // Aller directement à l'enrôlement
+          // Android demandera automatiquement PIN/empreinte
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) =>
-                  EnrollmentScreen(username: _usernameController.text.trim()),
+              builder: (_) => EnrollmentScreen(username: username),
             ),
           );
+        } else {
+          setState(() {
+            _errorMessage = result.error ?? 'Échec de l\'inscription';
+          });
         }
-      } else {
-        final error = jsonDecode(response.body);
-        setState(() {
-          _errorMessage = error['error'] ?? 'Erreur lors de l\'inscription';
-        });
-        print('Vérifier[RegisterScreen] Erreur: $_errorMessage');
       }
     } catch (e) {
+      print('[REGISTER] ✗ Erreur: $e');
       setState(() {
-        _errorMessage = 'Erreur de connexion: $e';
+        _errorMessage = 'Erreur: $e';
       });
-      print('Vérifier[RegisterScreen] Exception: $e');
     } finally {
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _isRegistering = false;
         });
       }
     }
@@ -96,214 +122,164 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Créer un compte')),
+      appBar: AppBar(
+        title: const Text('Créer un compte'),
+        backgroundColor: const Color(0xFFFF6B00),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Icon
-                const Icon(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 40),
+
+              // Logo
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF6B00).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
                   Icons.person_add,
-                  size: 80,
+                  size: 60,
                   color: Color(0xFFFF6B00),
                 ),
-                const SizedBox(height: 24),
+              ),
 
-                const Text(
-                  'Inscription MyMomo',
-                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
+              const SizedBox(height: 32),
+
+              const Text(
+                'Inscription',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFFF6B00),
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Etape 1 : Informations de base',
-                  style: TextStyle(fontSize: 14, color: Colors.grey),
-                  textAlign: TextAlign.center,
+                textAlign: TextAlign.center,
+              ),
+
+              const SizedBox(height: 8),
+
+              const Text(
+                'Authentification Zero-Knowledge',
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+
+              const SizedBox(height: 40),
+
+              // Username
+              TextField(
+                controller: _usernameController,
+                decoration: const InputDecoration(
+                  labelText: 'Nom d\'utilisateur',
+                  prefixIcon: Icon(Icons.person),
+                  border: OutlineInputBorder(),
                 ),
-                const SizedBox(height: 32),
+                enabled: !_isRegistering,
+              ),
 
-                // Champ Nom d'utilisateur
-                TextFormField(
-                  controller: _usernameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nom d\'utilisateur',
-                    hintText: 'clovis',
-                    prefixIcon: Icon(Icons.person),
-                  ),
-                  enabled: !_isLoading,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Le nom d\'utilisateur est requis';
-                    }
-                    if (value.length < 3) {
-                      return 'Au moins 3 caractères';
-                    }
-                    return null;
-                  },
+              const SizedBox(height: 16),
+
+              // Email
+              TextField(
+                controller: _emailController,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  prefixIcon: Icon(Icons.email),
+                  border: OutlineInputBorder(),
                 ),
-                const SizedBox(height: 16),
+                keyboardType: TextInputType.emailAddress,
+                enabled: !_isRegistering,
+              ),
 
-                // Champ Email
-                TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    hintText: 'clovis@gmail.com',
-                    prefixIcon: Icon(Icons.email),
-                  ),
-                  enabled: !_isLoading,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'L\'email est requis';
-                    }
-                    if (!value.contains('@')) {
-                      return 'Email invalide';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
+              const SizedBox(height: 24),
 
-                // Champ Téléphone
-                TextFormField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                    labelText: 'Téléphone',
-                    hintText: '+229 XX XX XX XX',
-                    prefixIcon: Icon(Icons.phone),
-                  ),
-                  enabled: !_isLoading,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Le numéro de téléphone est requis';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // Message d'erreur
-                if (_errorMessage != null)
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.red.shade200),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.error_outline, color: Colors.red.shade700),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _errorMessage!,
-                            style: TextStyle(color: Colors.red.shade900),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                const SizedBox(height: 24),
-
-                // Bouton d'inscription
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _register,
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.white,
-                            ),
-                          ),
-                        )
-                      : const Text('Créer mon compte'),
-                ),
-                const SizedBox(height: 24),
-
-                // Prochaines étapes
+              // Message d'erreur
+              if (_errorMessage != null)
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red.shade200),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Row(
-                        children: [
-                          Icon(Icons.info_outline, color: Colors.blue.shade700),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Prochaines étapes',
-                            style: TextStyle(
-                              color: Colors.blue.shade900,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
+                      const Icon(Icons.error, color: Colors.red),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: TextStyle(color: Colors.red.shade900),
+                        ),
                       ),
-                      const SizedBox(height: 12),
-                      _buildStep('1', 'Création de votre compte', true),
-                      _buildStep('2', 'Génération de votre Clé ZK', false),
-                      _buildStep('3', 'Configuration biometérie', false),
-                      _buildStep('4', 'Sauvegarde sécurisée', false),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
-  Widget _buildStep(String number, String text, bool current) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 8, top: 4),
-      child: Row(
-        children: [
-          Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              color: current ? const Color(0xFFFF6B00) : Colors.blue.shade700,
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                number,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+              // Bouton inscription
+              ElevatedButton(
+                onPressed: _isRegistering ? null : _register,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF6B00),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: _isRegistering
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Créer mon compte',
+                        style: TextStyle(fontSize: 16),
+                      ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Info sécurité
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Column(
+                  children: const [
+                    Icon(Icons.info_outline, color: Colors.blue),
+                    SizedBox(height: 12),
+                    Text(
+                      'Votre sécurité sera gérée par votre téléphone',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Android vous demandera automatiquement votre empreinte, Face ID ou code PIN lors de l\'enrôlement',
+                      style: TextStyle(fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
               ),
-            ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                color: Colors.blue.shade900,
-                fontSize: 13,
-                fontWeight: current ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

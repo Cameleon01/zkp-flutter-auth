@@ -175,3 +175,30 @@ class BackupResult {
     );
   }
 }
+
+/// Type de sécurité disponible sur l'appareil
+enum SecurityType {
+  none, // Aucune sécurité
+  pin, // PIN/mot de passe
+  fingerprint, // Empreinte digitale
+  face, // Reconnaissance faciale
+  iris, // Reconnaissance iris
+}
+
+/// Statut de sécurité de l'appareil
+class SecurityStatus {
+  final bool isAvailable;
+  final SecurityType type;
+  final String message;
+
+  SecurityStatus({
+    required this.isAvailable,
+    required this.type,
+    required this.message,
+  });
+
+  @override
+  String toString() {
+    return 'SecurityStatus(available: $isAvailable, type: $type, message: $message)';
+  }
+}

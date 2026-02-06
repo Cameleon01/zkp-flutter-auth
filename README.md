@@ -1,4 +1,4 @@
-# 🔐 ZK-AUTH - Projet Complet et Fonctionnel
+#  ZK-AUTH - Projet Complet et Fonctionnel
 
 **Version corrigée et complète avec sécurité post-authentification**
 
@@ -87,7 +87,7 @@ flutter run
 | **Diagramme de classes** | 55% | 90% | ✅ |
 | **Score global** | 55% | **92.5%** | ✅ |
 
-## 🔐 Nouveaux Endpoints API
+##  Nouveaux Endpoints API
 
 ```bash
 # Session management

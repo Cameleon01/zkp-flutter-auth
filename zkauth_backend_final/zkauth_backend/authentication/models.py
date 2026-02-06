@@ -24,7 +24,8 @@ class ZKAuthUser(models.Model):
         on_delete=models.CASCADE,
         related_name='zk_auth_profile'
     )
-    phone = models.CharField(max_length=20, unique=True)
+    # phone = models.CharField(max_length=20, null=True, blank=True, unique=True)
+    
     public_key = models.TextField(
         null=True,
         blank=True,
@@ -46,7 +47,7 @@ class ZKAuthUser(models.Model):
     class Meta:
         db_table = 'zk_auth_users'
         indexes = [
-            models.Index(fields=['phone']),
+            # models.Index(fields=['phone']),
             models.Index(fields=['is_enrolled']),
             models.Index(fields=['user']),
             models.Index(fields=['enrollment_status']),

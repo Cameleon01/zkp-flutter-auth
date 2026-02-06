@@ -6,7 +6,7 @@ Projet Flutter professionnel avec SDK réutilisable pour authentification Zero-K
 
 ```
 flutter_final/
-├── zk_auth_sdk/              # 🔐 SDK RÉUTILISABLE
+├── zk_auth_sdk/              #  SDK RÉUTILISABLE
 │   ├── lib/
 │   │   ├── api/
 │   │   │   └── zk_auth_client.dart
@@ -113,7 +113,7 @@ await zkAuth.enroll('user');
 await zkAuth.authenticate('user');
 ```
 
-## 🔐 Fonctionnalités
+##  Fonctionnalités
 
 ### Authentification
 - ✅ Inscription (username, email, phone)

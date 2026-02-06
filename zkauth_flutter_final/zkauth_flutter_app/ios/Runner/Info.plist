@@ -45,5 +45,20 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<key>NSFaceIDUsageDescription</key>
+<string>Authentification biométrique pour ZK-AUTH</string>
+
+<key>CFBundleURLTypes</key>
+<array>
+    <dict>
+        <key>CFBundleTypeRole</key>
+        <string>Editor</string>
+        <key>CFBundleURLSchemes</key>
+        <array>
+            <string>com.googleusercontent.apps.142399728757-ajsavvffefhj5jbrfhfqnr7nf3iitpq2.apps.googleusercontent.com</string>
+        </array>
+    </dict>
+</array>
 </dict>
 </plist>

@@ -31,13 +31,13 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
 
     if (isEnrolled && username != null) {
-      // Utilisateur déjÃ  enrÃ´lé, aller Ã  l'écran d'accueil
+      // Utilisateur déjà  enrollé, aller à  l'écran d'accueil
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
     } else {
-      // Nouvel utilisateur, aller Ã  la page de connexion
+      // Nouvel utilisateur, aller à  la page de connexion
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen()),

@@ -14,6 +14,7 @@ class ZKAuthClient {
   final SecureStorageManager _storage = SecureStorageManager();
   final GoogleDriveBackup _driveBackup = GoogleDriveBackup();
   final LocalAuthentication _localAuth = LocalAuthentication();
+
   ZKAuthClient({required this.baseUrl});
 
   // =========================================
@@ -327,5 +328,340 @@ class ZKAuthClient {
   /// Liste des utilisateurs enrÃ´lés sur cet appareil
   Future<List<String>> getEnrolledUsers() async {
     return await _storage.getEnrolledUsers();
+  }
+
+// ✅ NOUVELLE MÉTHODE : Enrôlement avec biométrie
+  Future<AuthResult> enrollWithBiometrics(String username) async {
+    try {
+      print(' Enrôlement avec biométrie pour: $username');
+
+      // 1. Vérifier biométrie
+      final canCheck = await _localAuth.canCheckBiometrics;
+      final isSupported = await _localAuth.isDeviceSupported();
+
+      if (canCheck && isSupported) {
+        print(' Demande biométrie...');
+
+        bool authenticated = false;
+        try {
+          authenticated = await _localAuth.authenticate(
+            localizedReason:
+                'Authentifiez-vous pour générer votre clé sécurisée',
+            options: const AuthenticationOptions(
+              stickyAuth: true,
+              biometricOnly: false,
+              useErrorDialogs: true,
+            ),
+          );
+        } on PlatformException catch (e) {
+          print('⚠️ Erreur biométrie: ${e.code}');
+          // Continuer sans biométrie
+        }
+
+        if (canCheck && !authenticated) {
+          return AuthResult(
+            success: false,
+            error: 'Authentification biométrique requise',
+          );
+        }
+
+        print('✅ Biométrie validée');
+      } else {
+        print('⚠️ Biométrie non disponible');
+      }
+
+      // 2. Enrôlement normal
+      return await enroll(username);
+    } catch (e) {
+      print('❌ Erreur enrollWithBiometrics: $e');
+      return AuthResult(success: false, error: e.toString());
+    }
+  }
+
+// ✅ NOUVELLE MÉTHODE : Sauvegarde Google Drive
+
+  Future<BackupResult> backupToGoogleDrive(String username) async {
+    try {
+      print('[BACKUP] Début sauvegarde pour: $username');
+
+      // 1. Vérifier et authentifier (flexible biométrie/PIN)
+      final authResult = await _authenticateForSensitiveOperation(
+        reason: 'Authentifiez-vous pour sauvegarder votre clé',
+      );
+
+      if (!authResult) {
+        return BackupResult.failure(
+          error: 'Authentification requise pour la sauvegarde',
+        );
+      }
+
+      print('[BACKUP] Authentification réussie');
+
+      // 2. Récupérer clé privée
+      final privateKey = await _storage.getPrivateKey(username);
+      if (privateKey == null) {
+        return BackupResult.failure(error: 'Clé privée introuvable');
+      }
+
+      print('[BACKUP] Clé récupérée: ${privateKey.length} chars');
+
+      // 3. Fragmenter
+      final mid = (privateKey.length / 2).ceil();
+      final fragmentA = privateKey.substring(0, mid);
+      final fragmentB = privateKey.substring(mid);
+
+      print('[BACKUP] Fragmenté: A=${fragmentA.length}, B=${fragmentB.length}');
+
+      // 4. Sauvegarder Fragment A sur Google Drive
+      final driveFileId = await _driveBackup.saveFragment(
+        username: username,
+        fragment: fragmentA,
+        fragmentType: 'A',
+      );
+
+      if (driveFileId == null) {
+        return BackupResult.failure(error: 'Échec Google Drive');
+      }
+
+      print('[BACKUP] Fragment A → Drive');
+
+      // 5. Envoyer Fragment B au serveur
+      try {
+        final response = await http.post(
+          Uri.parse('$baseUrl/api/auth/backup-fragment/'),
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({
+            'username': username,
+            'fragment': fragmentB,
+            'fragment_type': 'B',
+          }),
+        );
+
+        if (response.statusCode != 200 && response.statusCode != 201) {
+          print('[BACKUP] Serveur fragment B: ${response.statusCode}');
+        } else {
+          print('[BACKUP] Fragment B → Serveur');
+        }
+      } catch (e) {
+        print('[BACKUP] Erreur serveur: $e');
+      }
+
+      print('[BACKUP] Backup complet réussi');
+
+      return BackupResult.success(
+        driveFileId: driveFileId,
+        message: 'Fragment A → Google Drive\nFragment B → Serveur',
+      );
+    } catch (e) {
+      print('[BACKUP] Erreur: $e');
+      return BackupResult.failure(error: e.toString());
+    }
+  }
+
+// ✅ NOUVELLE MÉTHODE : Restauration depuis Google Drive
+  Future<AuthResult> restoreFromGoogleDrive({
+    required String username,
+    required String email,
+  }) async {
+    try {
+      print('🔄 Restauration pour: $username');
+
+      // 1. Récupérer Fragment A depuis Google Drive
+      final fragmentA = await _driveBackup.getFragment(
+        username: username,
+        fragmentType: 'A',
+      );
+
+      if (fragmentA == null) {
+        return AuthResult.failure(error: 'Fragment A non trouvé sur Drive');
+      }
+
+      print('✅ Fragment A récupéré');
+
+      // 2. Récupérer Fragment B depuis le serveur
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/auth/restore-fragment/'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'username': username,
+          'email': email,
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        return AuthResult.failure(error: 'Fragment B non trouvé sur serveur');
+      }
+
+      final data = json.decode(response.body);
+      final fragmentB = data['fragment'] as String;
+
+      print('✅ Fragment B récupéré');
+
+      // 3. Reconstituer la clé
+      final privateKey = fragmentA + fragmentB;
+
+      print('✅ Clé reconstituée: ${privateKey.length} chars');
+
+      // 4. Sauvegarder localement
+      await _storage.savePrivateKey(username, privateKey);
+      await _storage.setEnrolled(username, true);
+      await _storage.setCurrentUsername(username);
+
+      print('✅ Restauration réussie');
+
+      return AuthResult(
+        success: true,
+        message: 'Compte restauré avec succès',
+      );
+    } catch (e) {
+      print('❌ Erreur restauration: $e');
+      return AuthResult.failure(error: e.toString());
+    }
+  }
+
+  /// Vérifie si l'appareil a une sécurité configurée
+
+  Future<bool> _authenticateForSensitiveOperation({
+    required String reason,
+  }) async {
+    try {
+      // 1. Vérifier disponibilité biométrie
+      final canCheckBiometrics = await _localAuth.canCheckBiometrics;
+      final isDeviceSupported = await _localAuth.isDeviceSupported();
+
+      print('[AUTH] Biométrie disponible: $canCheckBiometrics');
+      print('[AUTH] Device supporté: $isDeviceSupported');
+
+      if (!canCheckBiometrics && !isDeviceSupported) {
+        // Aucune sécurité disponible
+        print('[AUTH] ⚠️ Aucune sécurité disponible sur cet appareil');
+        return false;
+      }
+
+      // 2. Obtenir les types de biométrie disponibles
+      List<BiometricType> availableBiometrics = [];
+      try {
+        availableBiometrics = await _localAuth.getAvailableBiometrics();
+        print('[AUTH] Types disponibles: $availableBiometrics');
+      } catch (e) {
+        print('[AUTH] Erreur getAvailableBiometrics: $e');
+      }
+
+      // 3. Tenter l'authentification
+      try {
+        final authenticated = await _localAuth.authenticate(
+          localizedReason: reason,
+          options: const AuthenticationOptions(
+            stickyAuth: true,
+            biometricOnly: false, // ✅ Permet PIN/mot de passe en fallback
+            useErrorDialogs: true,
+            sensitiveTransaction: true,
+          ),
+        );
+
+        if (authenticated) {
+          print('[AUTH] ✓ Authentification réussie');
+          return true;
+        } else {
+          print('[AUTH] ✗ Authentification refusée');
+          return false;
+        }
+      } on PlatformException catch (e) {
+        print('[AUTH] Exception: ${e.code} - ${e.message}');
+
+        // Gérer les erreurs spécifiques
+        switch (e.code) {
+          case 'NotAvailable':
+          case 'PasscodeNotSet':
+          case 'NotEnrolled':
+            print('[AUTH] ⚠️ Sécurité non configurée sur l\'appareil');
+            return false;
+
+          case 'LockedOut':
+          case 'PermanentlyLockedOut':
+            print('[AUTH] ⚠️ Appareil verrouillé après trop de tentatives');
+            return false;
+
+          case 'UserCanceled':
+            print('[AUTH] Utilisateur a annulé');
+            return false;
+
+          default:
+            print('[AUTH] Erreur inconnue: ${e.code}');
+            return false;
+        }
+      } catch (e) {
+        print('[AUTH] Erreur générale: $e');
+        return false;
+      }
+    } catch (e) {
+      print('[AUTH] Exception fatale: $e');
+      return false;
+    }
+  }
+
+  /// Vérifie si l'appareil a une sécurité configurée
+  Future<SecurityStatus> checkDeviceSecurity() async {
+    try {
+      final canCheckBiometrics = await _localAuth.canCheckBiometrics;
+      final isDeviceSupported = await _localAuth.isDeviceSupported();
+
+      if (!isDeviceSupported) {
+        return SecurityStatus(
+          isAvailable: false,
+          type: SecurityType.none,
+          message: 'Cet appareil ne supporte pas la sécurité biométrique',
+        );
+      }
+
+      if (!canCheckBiometrics) {
+        return SecurityStatus(
+          isAvailable: false,
+          type: SecurityType.none,
+          message:
+              'Aucune sécurité configurée. Veuillez configurer un code PIN, un mot de passe ou une empreinte dans les paramètres de votre téléphone',
+        );
+      }
+
+      // Vérifier les types disponibles
+      final availableBiometrics = await _localAuth.getAvailableBiometrics();
+
+      if (availableBiometrics.contains(BiometricType.fingerprint)) {
+        return SecurityStatus(
+          isAvailable: true,
+          type: SecurityType.fingerprint,
+          message: 'Empreinte digitale disponible',
+        );
+      }
+
+      if (availableBiometrics.contains(BiometricType.face)) {
+        return SecurityStatus(
+          isAvailable: true,
+          type: SecurityType.face,
+          message: 'Reconnaissance faciale disponible',
+        );
+      }
+
+      if (availableBiometrics.contains(BiometricType.iris)) {
+        return SecurityStatus(
+          isAvailable: true,
+          type: SecurityType.iris,
+          message: 'Reconnaissance iris disponible',
+        );
+      }
+
+      // PIN/mot de passe disponible
+      return SecurityStatus(
+        isAvailable: true,
+        type: SecurityType.pin,
+        message: 'Code PIN/mot de passe disponible',
+      );
+    } catch (e) {
+      return SecurityStatus(
+        isAvailable: false,
+        type: SecurityType.none,
+        message: 'Erreur lors de la vérification: $e',
+      );
+    }
   }
 }

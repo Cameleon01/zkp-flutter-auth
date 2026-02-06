@@ -10,22 +10,22 @@ class UserRegistrationSerializer(serializers.Serializer):
     """Serializer for user registration"""
     username = serializers.CharField(max_length=150)
     email = serializers.EmailField()
-    phone = serializers.CharField(max_length=20)
+    # phone = serializers.CharField(max_length=20)
     
     def validate_username(self, value):
         if User.objects.filter(username=value).exists():
-            raise serializers.ValidationError("Ce nom d'utilisateur existe dÃ©jÃ ")
+            raise serializers.ValidationError("Ce nom d'utilisateur existe deja")
         return value
     
     def validate_email(self, value):
         if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("Cet email est dÃ©jÃ  utilisÃ©")
+            raise serializers.ValidationError("Cet email est deja utilisé")
         return value
     
-    def validate_phone(self, value):
-        if ZKAuthUser.objects.filter(phone=value).exists():
-            raise serializers.ValidationError("Ce numÃ©ro de tÃ©lÃ©phone est dÃ©jÃ  utilisÃ©")
-        return value
+    # def validate_phone(self, value):
+    #     if ZKAuthUser.objects.filter(phone=value).exists():
+    #         raise serializers.ValidationError("Ce numéro de téléphone est déja  utilisé")
+    #     return value
 
 
 class EnrollmentSerializer(serializers.Serializer):
@@ -43,13 +43,13 @@ class EnrollmentSerializer(serializers.Serializer):
         
         # Should be 128 hex characters (64 bytes)
         if len(key) != 128:
-            raise serializers.ValidationError("ClÃ© publique invalide (longueur incorrecte)")
+            raise serializers.ValidationError("Clé publique invalide (longueur incorrecte)")
         
         # Should be valid hex
         try:
             int(key, 16)
         except ValueError:
-            raise serializers.ValidationError("ClÃ© publique invalide (format hexadÃ©cimal requis)")
+            raise serializers.ValidationError("Clé publique invalide (format hexadécimal requis)")
         
         return value
 
@@ -78,7 +78,6 @@ class ZKAuthUserSerializer(serializers.ModelSerializer):
             'id',
             'username',
             'email',
-            'phone',
             'is_enrolled',
             'enrolled_at',
             'last_authentication',

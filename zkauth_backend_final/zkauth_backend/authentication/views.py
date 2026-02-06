@@ -101,7 +101,7 @@ def register_user(request):
             # Create ZKAuthUser profile
             zk_user = ZKAuthUser.objects.create(
                 user=user,
-                phone=serializer.validated_data['phone'],
+                # phone=serializer.validated_data['phone'],
                 is_enrolled=False,
                 enrollment_status='pending'
             )
@@ -115,7 +115,7 @@ def register_user(request):
                     'id': zk_user.id,
                     'username': user.username,
                     'email': user.email,
-                    'phone': zk_user.phone,
+                    # 'phone': zk_user.phone,
                     'is_enrolled': False
                 }
             }, status=status.HTTP_201_CREATED)

@@ -7,9 +7,9 @@ from .models import ZKAuthUser, AuthenticationChallenge, AuthenticationLog, Devi
 
 @admin.register(ZKAuthUser)
 class ZKAuthUserAdmin(admin.ModelAdmin):
-    list_display = ['username', 'phone', 'is_enrolled', 'enrolled_at', 'last_authentication']
+    list_display = ['username',  'is_enrolled', 'enrolled_at', 'last_authentication']
     list_filter = ['is_enrolled', 'created_at']
-    search_fields = ['user__username', 'phone']
+    search_fields = ['user__username', ]
     readonly_fields = ['created_at', 'updated_at', 'enrolled_at']
     
     def username(self, obj):

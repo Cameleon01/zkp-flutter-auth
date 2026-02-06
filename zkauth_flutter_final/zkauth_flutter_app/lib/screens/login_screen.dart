@@ -85,7 +85,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       //  ÉTAPE 1 : Authentification biométrique LOCALE
       if (_biometricsAvailable) {
-        print('🔐 Demande biométrie...');
+        print(' Demande biométrie...');
 
         bool authenticated = false;
         try {
@@ -273,7 +273,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                   label: Text(
                     _biometricsAvailable
-                        ? 'Se connecter avec biométrie'
+                        ? 'Se connecter ' //avec biométrie
                         : 'Se connecter',
                   ),
                 ),
@@ -318,7 +318,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
 
                 // Statut biométrie
-                if (_biometricsChecked) ...[
+                /*                if (_biometricsChecked) ...[
                   const SizedBox(height: 16),
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -355,7 +355,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                   ),
-                ],
+                ], */
               ],
             ),
           ),

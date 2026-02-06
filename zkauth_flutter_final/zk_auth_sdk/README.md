@@ -1,4 +1,4 @@
-# 🔐 ZK-AUTH SDK
+#  ZK-AUTH SDK
 
 SDK Flutter réutilisable pour authentification Zero-Knowledge avec protocole Schnorr.
 

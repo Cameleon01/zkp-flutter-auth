@@ -31,7 +31,7 @@ class SchnorrVerifier:
         """
         try:
             print(f"\n{'='*60}")
-            print(f"ðŸ” SCHNORR VERIFICATION DEBUG")
+            print(f"SCHNORR VERIFICATION DEBUG")
             print(f"{'='*60}")
             
             # Extract proof components
@@ -39,7 +39,7 @@ class SchnorrVerifier:
             s_hex = proof_data.get('s')
             proof_challenge = proof_data.get('challenge')
             
-            print(f"\n1ï¸âƒ£ PROOF COMPONENTS:")
+            print(f"\n 1 PROOF COMPONENTS:")
             print(f"  r_hex length: {len(r_hex) if r_hex else 0}")
             print(f"  s_hex length: {len(s_hex) if s_hex else 0}")
             print(f"  r_hex (first 40): {r_hex[:40] if r_hex else None}...")
@@ -47,60 +47,60 @@ class SchnorrVerifier:
             
             # Validate inputs
             if not all([r_hex, s_hex, proof_challenge, challenge]):
-                print("âŒ Missing proof components")
+                print("Missing proof components")
                 return False
             
-            print(f"\n2ï¸âƒ£ CHALLENGE VERIFICATION:")
+            print(f"\n2ï¸ CHALLENGE VERIFICATION:")
             print(f"  Proof challenge: {proof_challenge[:40]}...")
             print(f"  Server challenge: {challenge[:40]}...")
             print(f"  Challenges match: {proof_challenge == challenge}")
             
             if proof_challenge != challenge:
-                print("âŒ Challenge mismatch!")
+                print("Challenge mismatch!")
                 return False
-            print("âœ… Challenges match")
+            print("Challenges match")
             
             # Parse public key
-            print(f"\n3ï¸âƒ£ PARSING PUBLIC KEY:")
+            print(f"\n 3 PARSING PUBLIC KEY:")
             print(f"  Public key hex (first 40): {public_key_hex[:40]}...")
             public_key_point = self._parse_public_key(public_key_hex)
             if public_key_point is None:
                 print("âŒ Invalid public key")
                 return False
-            print(f"âœ… Public key parsed successfully")
+            print(f" Public key parsed successfully")
             print(f"  Q.x = {public_key_point.x()}")
             print(f"  Q.y = {public_key_point.y()}")
             
             # Parse r (commitment point)
-            print(f"\n4ï¸âƒ£ PARSING COMMITMENT R:")
+            print(f"\n 4 PARSING COMMITMENT R:")
             r_point = self._parse_public_key(r_hex)
             if r_point is None:
                 print("âŒ Invalid commitment point r")
                 return False
-            print(f"âœ… Commitment point r parsed")
+            print(f" Commitment point r parsed")
             print(f"  r.x = {r_point.x()}")
             print(f"  r.y = {r_point.y()}")
             
             # Parse s (response scalar)
-            print(f"\n5ï¸âƒ£ PARSING RESPONSE S:")
+            print(f"\n 5 PARSING RESPONSE S:")
             s = int(s_hex, 16) % self.order
-            print(f"âœ… Response s parsed")
+            print(f" Response s parsed")
             print(f"  s (decimal) = {s}")
             print(f"  s (hex) = {hex(s)}")
             
             # Compute challenge hash: e = H(r || challenge)
-            print(f"\n6ï¸âƒ£ COMPUTING HASH e = H(r || challenge):")
+            print(f"\n 6 COMPUTING HASH e = H(r || challenge):")
             hash_input = r_hex + challenge
             print(f"  Hash input length: {len(hash_input)}")
             print(f"  Hash input (first 80): {hash_input[:80]}...")
             
             e = self._hash_to_scalar(hash_input)
-            print(f"âœ… Hash e computed")
+            print(f"  Hash  ")
             print(f"  e (decimal) = {e}")
             print(f"  e (hex) = {hex(e)}")
             
             # Verify: s * G = r + e * Q
-            print(f"\n7ï¸âƒ£ SCHNORR EQUATION: s*G = r + e*Q")
+            print(f"\n 7 SCHNORR EQUATION: s*G = r + e*Q")
             
             # Left side: s * G
             print(f"\n  LEFT SIDE (s * G):")
@@ -127,7 +127,7 @@ class SchnorrVerifier:
             print(f"    (r + e*Q).y = {right_side.y()}")
             
             # Compare points
-            print(f"\n8ï¸âƒ£ FINAL COMPARISON:")
+            print(f"\n 8 FINAL COMPARISON:")
             x_match = left_side.x() == right_side.x()
             y_match = left_side.y() == right_side.y()
             is_valid = x_match and y_match
@@ -143,16 +143,16 @@ class SchnorrVerifier:
             print(f"{'='*60}")
             
             if is_valid:
-                print("âœ… SCHNORR PROOF VERIFIED SUCCESSFULLY")
+                print("SCHNORR PROOF VERIFIED SUCCESSFULLY")
             else:
-                print("âŒ SCHNORR PROOF VERIFICATION FAILED")
+                print(" SCHNORR PROOF VERIFICATION FAILED")
             
             print(f"{'='*60}\n")
             
             return is_valid
             
         except Exception as e:
-            print(f"\nâŒ EXCEPTION in verify_proof: {str(e)}")
+            print(f"\n EXCEPTION in verify_proof: {str(e)}")
             import traceback
             traceback.print_exc()
             return False
@@ -174,7 +174,7 @@ class SchnorrVerifier:
             
             # Each coordinate is 32 bytes = 64 hex characters
             if len(hex_key) != 128:
-                print(f"âŒ Invalid key length: {len(hex_key)}, expected 128")
+                print(f" Invalid key length: {len(hex_key)}, expected 128")
                 return None
             
             # Parse x and y coordinates
@@ -195,7 +195,7 @@ class SchnorrVerifier:
             return point
             
         except Exception as e:
-            print(f"âŒ Error parsing public key: {str(e)}")
+            print(f"Error parsing public key: {str(e)}")
             return None
     
     def _hash_to_scalar(self, message):

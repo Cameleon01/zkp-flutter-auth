@@ -196,7 +196,7 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Enrollement Réussi!'),
         content: const Text(
-          'Voulez-vous sauvegarder votre Clé de restauration?\n\n'
+          'Vous êtes sur le point de sauvegarder votre clé de restauration.\n\n'
           'Cette sauvegarde vous permettra de recuperer votre compte '
           'si vous perdez votre téléphone.',
         ),
