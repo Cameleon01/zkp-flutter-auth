@@ -26,4 +26,6 @@ urlpatterns = [
     # Backup & Restore (NEW)
     path('api/auth/backup-fragment/', views.save_backup_fragment, name='backup_fragment'),
     path('api/auth/restore-fragment/', views.restore_account, name='restore_fragment'),
+
+    path('api/auth/verify-credentials/', views.verify_credentials, name='verify-credentials'),
 ]

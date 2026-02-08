@@ -5,6 +5,8 @@ import 'package:zk_auth_sdk/zk_auth_sdk.dart';
 import '../main.dart';
 import 'register_screen.dart';
 import 'home_screen.dart';
+import 'register_screen.dart';
+import 'restore_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -275,6 +277,27 @@ class _LoginScreenState extends State<LoginScreen> {
                     _biometricsAvailable
                         ? 'Se connecter ' //avec biométrie
                         : 'Se connecter',
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // ✅ BOUTON RESTAURER AJOUTÉ ICI
+                OutlinedButton.icon(
+                  onPressed: _isLoading
+                      ? null
+                      : () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const RestoreScreen(),
+                          ),
+                        ),
+                  icon: const Icon(Icons.restore),
+                  label: const Text('Restaurer mon compte'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),

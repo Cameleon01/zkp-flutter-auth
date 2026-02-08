@@ -458,7 +458,6 @@ class ZKAuthClient {
     }
   }
 
-// ✅ NOUVELLE MÉTHODE : Restauration depuis Google Drive
   Future<AuthResult> restoreFromGoogleDrive({
     required String username,
     required String email,
@@ -467,51 +466,57 @@ class ZKAuthClient {
       print('🔄 Restauration pour: $username');
 
       // 1. Récupérer Fragment A depuis Google Drive
+      print('[DRIVE] Récupération fragment A pour $username');
       final fragmentA = await _driveBackup.getFragment(
         username: username,
         fragmentType: 'A',
       );
 
-      if (fragmentA == null) {
-        return AuthResult.failure(error: 'Fragment A non trouvé sur Drive');
+      if (fragmentA == null || fragmentA.isEmpty) {
+        return AuthResult.failure(
+          error: 'Fragment A introuvable sur Google Drive',
+        );
       }
 
-      print('✅ Fragment A récupéré');
+      print('✅ Fragment A récupéré: ${fragmentA.length} chars');
+      print('📦 FRAGMENT A AVANT RESTAURATION: $fragmentA'); // ✅ AFFICHAGE
 
-      // 2. Récupérer Fragment B depuis le serveur
-      final response = await http.post(
-        Uri.parse('$baseUrl/api/auth/restore-fragment/'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'username': username,
-          'email': email,
-        }),
+      // 2. Récupérer Fragment B du serveur
+      final fragmentB = await restoreFragmentFromServer(
+        username: username,
+        email: email,
       );
 
-      if (response.statusCode != 200) {
-        return AuthResult.failure(error: 'Fragment B non trouvé sur serveur');
+      if (fragmentB == null || fragmentB.isEmpty) {
+        print('❌ Fragment B null ou vide');
+        return AuthResult.failure(
+          error: 'Fragment B introuvable sur le serveur',
+        );
       }
 
-      final data = json.decode(response.body);
-      final fragmentB = data['fragment'] as String;
-
-      print('✅ Fragment B récupéré');
+      print('✅ Fragment B récupéré: ${fragmentB.length} chars');
+      print('📦 FRAGMENT B AVANT RESTAURATION: $fragmentB'); // ✅ AFFICHAGE
 
       // 3. Reconstituer la clé
       final privateKey = fragmentA + fragmentB;
-
       print('✅ Clé reconstituée: ${privateKey.length} chars');
+      print('🔑 CLÉ COMPLÈTE AVANT RESTAURATION: $privateKey'); // ✅ AFFICHAGE
 
-      // 4. Sauvegarder localement
+      // 4. Sauvegarder localement (ancienne clé)
       await _storage.savePrivateKey(username, privateKey);
+
+      // ✅ AFFICHAGE NOUVELLE CLÉ
+      print('📦 NOUVELLE CLÉ PRIVÉE GÉNÉRÉE: $privateKey');
+      // print('📦 NOUVELLE CLÉ PUBLIQUE: $publicKey');
+
       await _storage.setEnrolled(username, true);
       await _storage.setCurrentUsername(username);
 
-      print('✅ Restauration réussie');
+      print('✅ Ancienne clé sauvegardée temporairement');
 
       return AuthResult(
         success: true,
-        message: 'Compte restauré avec succès',
+        message: 'Fragments récupérés avec succès',
       );
     } catch (e) {
       print('❌ Erreur restauration: $e');
@@ -662,6 +667,87 @@ class ZKAuthClient {
         type: SecurityType.none,
         message: 'Erreur lors de la vérification: $e',
       );
+    }
+  }
+
+  /// Récupérer le fragment B depuis le serveur
+  Future<String?> restoreFragmentFromServer({
+    required String username,
+    required String email,
+  }) async {
+    try {
+      print('[SERVER] Récupération fragment B pour: $username');
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/auth/restore-fragment/'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'username': username,
+          'email': email,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final fragment = data['fragment_b'];
+
+        if (fragment == null || fragment.isEmpty) {
+          print('[SERVER] ⚠️ Fragment B null ou vide');
+          return null;
+        }
+
+        print('[SERVER] ✓ Fragment B récupéré: ${fragment.length} chars');
+        return fragment as String;
+      } else {
+        print('[SERVER] ✗ Erreur ${response.statusCode}: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('[SERVER] ✗ Exception: $e');
+      return null;
+    }
+  }
+
+  /// Récupérer la clé privée stockée
+  Future<String?> getStoredPrivateKey(String username) async {
+    return await _storage.getPrivateKey(username);
+  }
+
+  /// Générer clé publique depuis clé privée
+  String getPublicKeyFromPrivate(String privateKeyHex) {
+    return _crypto.getPublicKeyFromPrivate(privateKeyHex);
+  }
+
+  /// Vérifier username et email AVANT restauration
+  Future<bool> verifyUserCredentials({
+    required String username,
+    required String email,
+  }) async {
+    try {
+      print('[VERIFY] Vérification: $username / $email');
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/auth/verify-credentials/'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'username': username,
+          'email': email,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final valid = data['valid'] ?? false;
+
+        print('[VERIFY] Résultat: $valid');
+        return valid;
+      }
+
+      print('[VERIFY] Erreur ${response.statusCode}');
+      return false;
+    } catch (e) {
+      print('[VERIFY] Exception: $e');
+      return false;
     }
   }
 }

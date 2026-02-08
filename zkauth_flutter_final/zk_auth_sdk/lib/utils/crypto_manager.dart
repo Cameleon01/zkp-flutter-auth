@@ -169,4 +169,37 @@ class CryptoManager {
     final digest = sha256.convert(bytes);
     return _bytesToBigInt(Uint8List.fromList(digest.bytes)) % _secp256k1.n;
   }
+
+  /// Générer la clé publique depuis une clé privée
+  String getPublicKeyFromPrivate(String privateKeyHex) {
+    try {
+      final privateKeyBytes = _hexToBytes(privateKeyHex);
+      final privateKey = ECPrivateKey(privateKeyBytes as BigInt?, _secp256k1);
+
+      // Calculer la clé publique (point sur la courbe)
+      final publicKeyPoint = (_secp256k1.G * privateKey.d)!;
+
+      // Encoder en format non compressé (04 + x + y)
+      final publicKeyBytes = publicKeyPoint.getEncoded(false);
+
+      return _bytesToHex(publicKeyBytes);
+    } catch (e) {
+      print('[CRYPTO] Erreur génération clé publique: $e');
+      rethrow;
+    }
+  }
+
+  /// Convertir hex en bytes
+  Uint8List _hexToBytes(String hex) {
+    final result = Uint8List(hex.length ~/ 2);
+    for (var i = 0; i < hex.length; i += 2) {
+      result[i ~/ 2] = int.parse(hex.substring(i, i + 2), radix: 16);
+    }
+    return result;
+  }
+
+  /// Convertir bytes en hex
+  String _bytesToHex(Uint8List bytes) {
+    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join('');
+  }
 }

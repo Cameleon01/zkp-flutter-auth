@@ -336,8 +336,8 @@ class BackupScreen extends StatefulWidget {
 
 class _BackupScreenState extends State<BackupScreen> {
   final ZKAuthClient _zkAuthClient = ZKAuthClient(
-    baseUrl: 'http://10.64.10.211:8000',
-    // baseUrl: 'http://192.168.100.6:8000',
+    // baseUrl: 'http://10.64.10.211:8000',
+    baseUrl: 'http://192.168.100.6:8000',
     //baseUrl: 'http://172.25.215.80:8000', //
   );
 
@@ -347,7 +347,7 @@ class _BackupScreenState extends State<BackupScreen> {
   String? _driveFileId;
 
   /// Fonction principale de sauvegarde avec Google Drive
-  Future<void> _performBackup() async {
+  Future<void> performBackup() async {
     setState(() {
       _isBackingUp = true;
       _errorMessage = null;
@@ -600,7 +600,7 @@ class _BackupScreenState extends State<BackupScreen> {
               // Bouton de sauvegarde
               if (!_backupComplete)
                 ElevatedButton(
-                  onPressed: _isBackingUp ? null : _performBackup,
+                  onPressed: _isBackingUp ? null : performBackup,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFF6B00),
                     padding: const EdgeInsets.symmetric(vertical: 16),

@@ -113,6 +113,7 @@ class GoogleDriveBackup {
       print('[DRIVE] Récupération fragment $fragmentType pour $username');
 
       // 1. Connexion Google
+      await _googleSignIn.signOut();
       final account = await _googleSignIn.signIn();
       if (account == null) {
         print('[DRIVE] Connexion annulée');

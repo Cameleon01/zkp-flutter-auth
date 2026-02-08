@@ -172,12 +172,21 @@ def enroll_user(request):
                 )
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Check if already enrolled
+        # Verify user exists
+        zk_user = ZKAuthUser.objects.select_related('user').get(user__username=username)
+
+        # Si déjà enrôlé, mettre à jour au lieu de refuser
         if zk_user.is_enrolled:
+            logger.info(f"Mise à jour enrollment pour: {username}")
+            
+            # Mettre à jour la clé publique
+            zk_user.public_key = public_key
+            zk_user.save()
+            
             return Response({
-                'success': False,
-                'error': 'Utilisateur déjà enrôlé'
-            }, status=status.HTTP_400_BAD_REQUEST)
+                'success': True,
+                'message': 'Clé publique mise à jour avec succès'
+            }, status=status.HTTP_200_OK)
         
         # Validate public key format
         if not validate_public_key(public_key):
@@ -731,7 +740,8 @@ def restore_account(request):
     """
     username = request.data.get('username')
     email = request.data.get('email')
-    
+    print(username)
+    print(email)
     if not all([username, email]):
         return Response({
             'success': False,
@@ -751,8 +761,8 @@ def restore_account(request):
                     'error': 'Aucune sauvegarde trouvée'
                 }, status=status.HTTP_404_NOT_FOUND)
             
-            logger.info(f"🔄 Fragment retrieved for restoration: {username}")
-            
+            logger.info(f"Fragment retrieved for restoration: {username}")
+            print(backup.fragment_b_encrypted)
             return Response({
                 'success': True,
                 'fragment_b': backup.fragment_b_encrypted,
@@ -776,3 +786,54 @@ def restore_account(request):
             'success': False,
             'error': 'Erreur restauration'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+@api_view(['POST'])
+# @csrf_exempt
+def verify_credentials(request):
+    """
+    Vérifier username et email AVANT restauration
+    
+    POST /api/auth/verify-credentials/
+    {
+        "username": "user123",
+        "email": "user@example.com"
+    }
+    """
+    username = request.data.get('username')
+    email = request.data.get('email')
+    
+    if not username or not email:
+        return Response({
+            'valid': False,
+            'error': 'Username et email requis'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        # Vérifier que l'utilisateur existe avec cet email
+        user = User.objects.get(username=username, email=email)
+        
+        # Vérifier qu'il a un profil ZK-AUTH
+        zk_user = ZKAuthUser.objects.get(user=user)
+        
+        logger.info(f"Credentials valides pour: {username}")
+        
+        return Response({
+            'valid': True,
+            'message': 'Identifiants valides'
+        }, status=status.HTTP_200_OK)
+        
+    except User.DoesNotExist:
+        logger.warning(f"User introuvable: {username}")
+        return Response({
+            'valid': False,
+            'error': 'Utilisateur introuvable'
+        }, status=status.HTTP_404_NOT_FOUND)
+        
+    except ZKAuthUser.DoesNotExist:
+        logger.warning(f"ZKAuthUser introuvable: {username}")
+        return Response({
+            'valid': False,
+            'error': 'Profil ZK-AUTH introuvable'
+        }, status=status.HTTP_404_NOT_FOUND)
