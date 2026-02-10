@@ -1,9 +1,14 @@
 """
-Django settings for zkauth_project.
+Django settings for zkauth_project - VERSION CORRIGEE AUDIT
+Corrections :
+  - 4.2.3 : Configuration REST_FRAMEWORK avec throttling
+  - 4.2.5 : Settings HTTPS pour production
+  - 4.3(g) : DEFAULT_CHARSET UTF-8
 """
 
 from pathlib import Path
 from decouple import config, Csv
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -14,7 +19,11 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-ms(j!0sgkyxef8(wlvr!3
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,10.64.10.211,0.0.0.0,192.168.100.6,172.25.215.80', cast=Csv())
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS',
+    default='localhost,127.0.0.1,10.64.10.211,0.0.0.0,192.168.100.6,172.25.215.80,10.231.72.80',
+    cast=Csv()
+)
 
 # Application definition
 INSTALLED_APPS = [
@@ -24,11 +33,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+
     # Third party
     'rest_framework',
     'corsheaders',
-    
+
     # Local apps
     'authentication',
 ]
@@ -65,11 +74,12 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'zkauth_project.wsgi.application'
 
+
 # Database
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME', default='momo_db1'),
+        'ENGINE': config('DB_ENGINE', default='django.db.backends.postgresql'),
+        'NAME': config('DB_NAME', default='zk01'),
         'USER': config('DB_USER', default='postgres'),
         'PASSWORD': config('DB_PASSWORD', default='Sunbeam@12'),
         'HOST': config('DB_HOST', default='localhost'),
@@ -77,58 +87,96 @@ DATABASES = {
     }
 }
 
+
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
+
 
 # Internationalization
 LANGUAGE_CODE = 'fr-fr'
-TIME_ZONE = 'Africa/Porto-Novo'
+TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-# Static files (CSS, JavaScript, Images)
+# CORRECTION 4.3(g) : Forcer UTF-8
+DEFAULT_CHARSET = 'utf-8'
+FILE_CHARSET = 'utf-8'
+
+# Static files
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# REST Framework
+
+# ============================================================
+# CORRECTION 4.2.3 : REST Framework avec Rate Limiting
+# ============================================================
 REST_FRAMEWORK = {
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/hour',
+        'user': '1000/hour',
+        'register': '10/min',
+        'authenticate': '5/min',
+        'challenge': '10/min',
+        'sensitive': '3/min',
+        'authenticated': '30/min',
+    },
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
     ],
-    'DEFAULT_PARSER_CLASSES': [
-        'rest_framework.parsers.JSONParser',
-    ],
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
-    ],
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
-    ],
+    # CORRECTION: Forcer UTF-8 dans les reponses JSON
+    'UNICODE_JSON': True,
 }
 
-# CORS Settings
-CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=True, cast=bool)
-#CORS_ALLOWED_ORIGINS = config(
- #   'CORS_ALLOWED_ORIGINS',
-  #  default='http://localhost:3000,http://127.0.0.1:3000,http://10.64.10.59:3000',
-   # cast=Csv()
-#)
+
+# ============================================================
+# CORRECTION 4.2.5 : HTTPS Settings pour production
+# ============================================================
+if not DEBUG:
+    # Forcer HTTPS en production
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_HSTS_SECONDS = 31536000  # 1 an
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    X_FRAME_OPTIONS = 'DENY'
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+else:
+    # En developpement, desactiver les redirections SSL
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+
+
+# CORS
+CORS_ALLOW_ALL_ORIGINS = DEBUG
+CORS_ALLOWED_ORIGINS = config(
+    'CORS_ALLOWED_ORIGINS',
+    default='http://localhost:3000,http://10.231.72.80:8000' ,
+    cast=Csv()
+) if not DEBUG else []
+
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:3000',
+    'http://10.231.72.80:8000',
+]
+
+CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOW_METHODS = [
     'DELETE',
@@ -151,11 +199,6 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
 ]
 
-# ZK-AUTH Specific Settings
-ZK_AUTH_CHALLENGE_EXPIRY = 300  # 5 minutes
-ZK_AUTH_MAX_LOGIN_ATTEMPTS = 5
-ZK_AUTH_LOCKOUT_DURATION = 900  # 15 minutes
-
 # Logging
 LOGGING = {
     'version': 1,
@@ -167,20 +210,23 @@ LOGGING = {
         },
     },
     'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'zkauth.log',
             'formatter': 'verbose',
         },
-        'file': {
-            'class': 'logging.FileHandler',
-            'filename': BASE_DIR / 'logs' / 'zkauth.log',
+        'console': {
+            'level': 'WARNING' if not DEBUG else 'DEBUG',
+            'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
     },
     'loggers': {
         'authentication': {
-            'handlers': ['console', 'file'],
+            'handlers': ['file', 'console'],
             'level': 'INFO',
+            'propagate': True,
         },
     },
 }

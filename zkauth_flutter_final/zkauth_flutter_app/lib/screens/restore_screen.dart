@@ -2,6 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:zk_auth_sdk/zk_auth_sdk.dart';
 import '../main.dart';
 
+/// Écran de restauration - VERSION CORRIGÉE AUDIT
+///
+/// CORRECTIONS :
+///   - Le flux complet (déchiffrement + reconstruction + re-enrôlement)
+///     est maintenant dans zkAuthClient.restoreFromGoogleDrive()
+///   - Plus besoin d'appeler enrollWithBiometrics() séparément
+///   - Suppression du TODO placeholder + Future.delayed(2s)
+///
+/// Emplacement : zkauth_flutter_app/lib/screens/restore_screen.dart
 class RestoreScreen extends StatefulWidget {
   const RestoreScreen({super.key});
 
@@ -15,6 +24,7 @@ class _RestoreScreenState extends State<RestoreScreen> {
   bool _isLoading = false;
   String? _errorMessage;
   String? _successMessage;
+  int _currentStep = 0; // Pour le stepper visuel
 
   @override
   void dispose() {
@@ -36,6 +46,7 @@ class _RestoreScreenState extends State<RestoreScreen> {
       _isLoading = true;
       _errorMessage = null;
       _successMessage = null;
+      _currentStep = 0;
     });
 
     try {
@@ -44,8 +55,11 @@ class _RestoreScreenState extends State<RestoreScreen> {
 
       print('[RESTORE] Début restauration pour: $username');
 
-      // ✅ ÉTAPE 1 : Vérifier username/email AVANT biométrie
+      // =============================================
+      // ÉTAPE 1 : Vérifier username/email
+      // =============================================
       setState(() {
+        _currentStep = 1;
         _successMessage = 'Vérification des identifiants...';
       });
 
@@ -64,9 +78,17 @@ class _RestoreScreenState extends State<RestoreScreen> {
 
       print('[RESTORE] ✓ Identifiants valides');
 
-      // ✅ ÉTAPE 2 : Récupération fragments (avec affichage console)
+      // =============================================
+      // ÉTAPE 2 : Restauration complète via le SDK
+      //   - Récupère Fragment A (Drive) + Fragment B (serveur)
+      //   - Déchiffre les fragments (AES-256-GCM)
+      //   - Reconstruit la clé (XOR)
+      //   - Génère nouvelle paire de clés
+      //   - Re-enrôlement avec nouvelle clé publique
+      // =============================================
       setState(() {
-        _successMessage = 'Récupération des fragments...';
+        _currentStep = 2;
+        _successMessage = 'Récupération et déchiffrement des fragments...';
       });
 
       final result = await zkAuthClient.restoreFromGoogleDrive(
@@ -82,31 +104,20 @@ class _RestoreScreenState extends State<RestoreScreen> {
         return;
       }
 
-      print('[RESTORE] ✓ Fragments récupérés et validés');
-
-      // ✅ ÉTAPE 3 : Génération nouvelle paire de clés
+      // =============================================
+      // ÉTAPE 3 : Succès
+      // =============================================
       setState(() {
-        _successMessage = 'Génération nouvelle paire de clés...';
+        _currentStep = 3;
+        _successMessage = 'Compte restauré avec succès !';
       });
 
-      print('[RESTORE] Génération nouvelle paire de clés');
-
-      final enrollResult = await zkAuthClient.enrollWithBiometrics(username);
-
-      if (!enrollResult.success) {
-        throw Exception(enrollResult.error ?? 'Échec génération nouvelle clé');
-      }
-
-      print('[RESTORE] ✓ Nouvelle paire de clés générée et enrôlée');
-
-      setState(() {
-        _successMessage = 'Compte restauré avec succès';
-      });
+      print('[RESTORE] ✓ Restauration complète réussie');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Restauration complète réussie'),
+            content: Text('✅ Restauration complète réussie'),
             backgroundColor: Colors.green,
           ),
         );
@@ -114,11 +125,15 @@ class _RestoreScreenState extends State<RestoreScreen> {
         await Future.delayed(const Duration(seconds: 2));
 
         if (mounted) {
-          Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/login',
+            (route) => false,
+          );
         }
       }
     } catch (e) {
-      print('[RESTORE] Exception: $e');
+      print('[RESTORE] ❌ Exception: $e');
       setState(() {
         _errorMessage = 'Erreur: $e';
         _isLoading = false;
@@ -134,10 +149,14 @@ class _RestoreScreenState extends State<RestoreScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isComplete =
+        _successMessage != null && !_successMessage!.contains('...');
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Restaurer compte'),
         backgroundColor: const Color(0xFFFF6B00),
+        foregroundColor: Colors.white,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -145,23 +164,16 @@ class _RestoreScreenState extends State<RestoreScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Icône d'en-tête
               Icon(
-                _successMessage != null && !_successMessage!.contains('cours')
-                    ? Icons.cloud_done
-                    : Icons.restore,
+                isComplete ? Icons.cloud_done : Icons.restore,
                 size: 80,
-                color:
-                    _successMessage != null &&
-                        !_successMessage!.contains('cours')
-                    ? Colors.green
-                    : const Color(0xFFFF6B00),
+                color: isComplete ? Colors.green : const Color(0xFFFF6B00),
               ),
               const SizedBox(height: 24),
 
               Text(
-                _successMessage != null && !_successMessage!.contains('cours')
-                    ? 'Restauration réussie'
-                    : 'Restaurer votre compte',
+                isComplete ? 'Restauration réussie' : 'Restaurer votre compte',
                 style: const TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
@@ -170,10 +182,11 @@ class _RestoreScreenState extends State<RestoreScreen> {
               ),
               const SizedBox(height: 16),
 
-              if (_successMessage == null ||
-                  _successMessage!.contains('cours')) ...[
+              // Formulaire (visible tant que pas terminé)
+              if (!isComplete) ...[
                 const Text(
-                  'Entrez vos identifiants pour récupérer votre compte depuis la sauvegarde chiffrée.',
+                  'Entrez vos identifiants pour récupérer votre compte '
+                  'depuis la sauvegarde chiffrée.',
                   style: TextStyle(fontSize: 14, color: Colors.grey),
                   textAlign: TextAlign.center,
                 ),
@@ -202,7 +215,7 @@ class _RestoreScreenState extends State<RestoreScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Informations sur le processus
+                // Info processus
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -210,9 +223,9 @@ class _RestoreScreenState extends State<RestoreScreen> {
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.blue.shade200),
                   ),
-                  child: Column(
+                  child: const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Row(
                         children: [
                           Icon(
@@ -232,41 +245,30 @@ class _RestoreScreenState extends State<RestoreScreen> {
                       ),
                       SizedBox(height: 8),
                       Text(
-                        '1. Récupération Fragment A (Google Drive)',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        '2. Récupération Fragment B (Serveur)',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        '3. Reconstitution de votre clé',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        '4. Ré-enrôlement sur ce device',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        '5. Destruction ancienne clé',
-                        style: TextStyle(fontSize: 12),
+                        '1. Vérification de vos identifiants\n'
+                        '2. Récupération Fragment A (Google Drive)\n'
+                        '3. Récupération Fragment B (Serveur)\n'
+                        '4. Déchiffrement AES-256-GCM\n'
+                        '5. Reconstruction clé par XOR\n'
+                        '6. Génération nouvelle paire de clés\n'
+                        '7. Re-enrôlement sécurisé',
+                        style: TextStyle(fontSize: 12, height: 1.5),
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(height: 24),
               ],
 
-              const SizedBox(height: 24),
+              // Stepper de progression (visible pendant le chargement)
+              if (_isLoading || isComplete) _buildProgressStepper(),
+
+              const SizedBox(height: 16),
 
               // Message d'erreur
               if (_errorMessage != null)
                 Container(
                   padding: const EdgeInsets.all(12),
-                  margin: const EdgeInsets.only(bottom: 24),
                   decoration: BoxDecoration(
                     color: Colors.red.shade50,
                     borderRadius: BorderRadius.circular(8),
@@ -286,52 +288,72 @@ class _RestoreScreenState extends State<RestoreScreen> {
                   ),
                 ),
 
-              // Message de succès/progression
-              if (_successMessage != null)
+              // Message de succès en cours
+              if (_successMessage != null && _successMessage!.contains('...'))
                 Container(
                   padding: const EdgeInsets.all(12),
-                  margin: const EdgeInsets.only(bottom: 24),
                   decoration: BoxDecoration(
-                    color: _successMessage!.contains('cours')
-                        ? Colors.blue.shade50
-                        : Colors.green.shade50,
+                    color: Colors.blue.shade50,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: _successMessage!.contains('cours')
-                          ? Colors.blue.shade200
-                          : Colors.green.shade200,
-                    ),
+                    border: Border.all(color: Colors.blue.shade200),
                   ),
                   child: Row(
                     children: [
-                      _successMessage!.contains('cours')
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.check_circle, color: Colors.green),
+                      const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           _successMessage!,
-                          style: TextStyle(
-                            color: _successMessage!.contains('cours')
-                                ? Colors.blue.shade900
-                                : Colors.green.shade900,
-                          ),
+                          style: TextStyle(color: Colors.blue.shade900),
                         ),
                       ),
                     ],
                   ),
                 ),
 
+              // Succès final
+              if (isComplete)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green.shade200),
+                  ),
+                  child: Column(
+                    children: [
+                      const Icon(
+                        Icons.check_circle,
+                        color: Colors.green,
+                        size: 40,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _successMessage!,
+                        style: TextStyle(
+                          color: Colors.green.shade900,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+
+              const SizedBox(height: 24),
+
               // Bouton restaurer
-              if (_successMessage == null || _successMessage!.contains('cours'))
+              if (!isComplete)
                 ElevatedButton(
                   onPressed: _isLoading ? null : _startRestore,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFF6B00),
+                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -355,6 +377,75 @@ class _RestoreScreenState extends State<RestoreScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  /// Widget stepper de progression
+  Widget _buildProgressStepper() {
+    final steps = [
+      'Vérification identifiants',
+      'Récupération + déchiffrement',
+      'Restauration complète',
+    ];
+
+    return Column(
+      children: List.generate(steps.length, (index) {
+        final stepNum = index + 1;
+        final isDone = _currentStep > stepNum;
+        final isCurrent = _currentStep == stepNum;
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isDone
+                      ? Colors.green
+                      : isCurrent
+                      ? const Color(0xFFFF6B00)
+                      : Colors.grey.shade300,
+                ),
+                child: Center(
+                  child: isDone
+                      ? const Icon(Icons.check, color: Colors.white, size: 16)
+                      : Text(
+                          '$stepNum',
+                          style: TextStyle(
+                            color: isCurrent
+                                ? Colors.white
+                                : Colors.grey.shade600,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  steps[index],
+                  style: TextStyle(
+                    color: isDone || isCurrent
+                        ? Colors.black87
+                        : Colors.grey.shade500,
+                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ),
+              if (isCurrent)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
+          ),
+        );
+      }),
     );
   }
 }
