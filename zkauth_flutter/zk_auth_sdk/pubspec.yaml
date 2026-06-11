@@ -1,0 +1,29 @@
+name: zk_auth_sdk
+description: Zero-Knowledge Authentication SDK for Flutter using Schnorr Protocol
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  flutter_secure_storage: ^9.0.0
+  local_auth: ^2.1.7
+  crypto: ^3.0.3
+  pointycastle: ^3.7.3
+  convert: ^3.1.1
+  
+  # Google Drive
+  google_sign_in: ^6.2.1
+  googleapis: ^13.2.0
+  googleapis_auth: ^1.6.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+
